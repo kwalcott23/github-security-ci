@@ -1,35 +1,49 @@
-name: CI with Security Checks
+name: Dependency and Code Security Scan
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  test-and-scan:
+  build-and-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip' # Speeds up subsequent runs
+
+    - name: Install dependencies (including security tools)
+      run: |
+        # Install project dependencies from requirements.txt
+        pip install -r requirements.txt
+        # Install security scanning tools
+        pip install safety bandit
+
+    - name: Run Unit Tests
+      run: |
+        pytest test_app.py
+
+    # --- SECURITY SCANNING STAGE ---
+    
+    - name: Dependency Vulnerability Check (Safety)
+      # This step uses 'continue-on-error: true' as required.
+      # The workflow will complete even if vulnerabilities are found, 
+      # allowing us to see the warnings.
+      continue-on-error: true
+      run: |
+        echo "Running 'safety check' against installed dependencies..."
+        safety check -r requirements.txt || true # '|| true' ensures the command doesn't fail the step if issues are found
       
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install safety bandit
-      
-      - name: Run Tests
-        run: pytest tests/
-      
-      - name: Security Check 1 - Dependency Scan
-        run: |
-          echo "🔍 Checking for vulnerable dependencies..."
-          safety check
-        continue-on-error: true
-      
-      - name: Security Check 2 - Code Security Scan  
-        run: |
-          echo "🔐 Scanning code for security issues..."
-          bandit -r src/ -ll
-        continue-on-error: true
+    - name: Code Security Scan (Bandit)
+      # Scans the project's source code (app.py) for common security issues.
+      run: |
+        echo "Running 'bandit' on source code..."
+        bandit -r . -x ./test_app.py -ll
