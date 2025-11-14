@@ -1,5 +1,6 @@
 import pytest
 from app import add, subtract, get_data
+import requests # <-- Added this import to access requests.exceptions
 
 # Simple tests for basic arithmetic
 def test_add():
@@ -30,7 +31,10 @@ def test_get_data_mock_success(monkeypatch):
 def test_get_data_mock_failure(monkeypatch):
     # Mock the requests.get method to raise an exception
     def mock_get_error(*args, **kwargs):
-        raise pytest.raises(Exception("Connection error"))
+        # FIX: We must raise the exception instance directly, 
+        # not use pytest.raises(). We use RequestException because 
+        # app.py catches it.
+        raise requests.exceptions.RequestException("Connection error")
 
     monkeypatch.setattr("requests.get", mock_get_error)
     result = get_data("http://errorurl.com")
